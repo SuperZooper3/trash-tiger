@@ -5,7 +5,7 @@ ser = serial.Serial('/dev/cu.usbmodem1101', 9600)
 
 class App:
     def __init__(self):
-        pyxel.init(width=160, height=120, title="Trash Tiger", fps=15)
+        pyxel.init(width=160, height=120, title="Ski bot", fps=15)
         pyxel.run(self.update, self.draw)
         self.received = ""
         self.payload = ""
@@ -25,6 +25,8 @@ class App:
             self.payload += "K"
         if pyxel.btn(pyxel.KEY_L):
             self.payload += "L"
+        if pyxel.btn(pyxel.KEY_SHIFT):
+            self.payload += "H"  # H for High speed / boost mode
         self.payload += "E" # E for the end of the payload
         ser.write(self.payload.encode())
         
@@ -36,10 +38,11 @@ class App:
 
 
     def draw(self) -> None:
+        # every 10 frames the colour should change by 1 and go back to 16 but make sure its calculated just based off frame count
+        colour = (pyxel.frame_count // 10) % 15 + 1
         pyxel.cls(0)
-        pyxel.text(0, 0, f"Trash Tiger! Alive {self.alive}", pyxel.frame_count % 16)
-        pyxel.text(0, 10, f"Sending: {self.payload}", pyxel.frame_count % 16)
-        pyxel.text(0, 20, self.received, pyxel.frame_count % 16)
-
+        pyxel.text(0, 0, f"Skibot! Alive {self.alive}", colour)
+        pyxel.text(0, 10, f"Sending: {self.payload}", colour)
+        pyxel.text(0, 20, self.received, colour)
 
 game = App()

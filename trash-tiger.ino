@@ -12,95 +12,61 @@ Servo servo;
 int angle = 45;
 int last_time = 0;
 const int max_angle = 60;
-int left_direction = 0;
-int right_direction = 0;
+int left_speed = 0;  // -255 to 255, negative = backward
+int right_speed = 0;
 
 void setup() {
   Serial.begin(9600);
   servo.attach(SERVO);
-  // servo.write(0);
-  // delay(1000);
-  // servo.write(180);
-  // delay(1000);
-  // servo.write(0);
-
+  
   pinMode(ENA, OUTPUT);
   pinMode(IN1, OUTPUT);
   pinMode(IN2, OUTPUT);
   pinMode(IN3, OUTPUT);
   pinMode(IN4, OUTPUT);
   pinMode(ENB, OUTPUT);
-
 }
 
-int rbCount = 0;
-
-void rightBackward(int speed) {
-  if (rbCount % speed == 0) {
-    digitalWrite(ENA, HIGH);
-    digitalWrite(IN1, HIGH);
-    digitalWrite(IN2, LOW);
-  } else {
-    rightStop();
-  }
-  rbCount++;
-}
-
-int rfCount = 0;
-
-void rightForward(int speed) {
-  if (rfCount % speed == 0) {
-    digitalWrite(ENA, HIGH);
-    digitalWrite(IN1, LOW);
-    digitalWrite(IN2, HIGH);
-  } else {
-    rightStop();
-  }
-  rfCount++;
-}
-
-void rightStop() {
-  digitalWrite(ENA, LOW);
-  digitalWrite(IN1, LOW);
-  digitalWrite(IN2, LOW);
-}
-
-int lbCount = 0;
-
-void leftBackward(int speed) {
-  if (lbCount % speed == 0) {
-    digitalWrite(ENB, HIGH);
-    digitalWrite(IN3, HIGH);
-    digitalWrite(IN4, LOW);
-  } else {
-    leftStop();
-  }
-  lbCount++;
-}
-
-int lfCount = 0;
-
-void leftForward(int speed) {
-  if (lfCount % speed == 0) {
-    digitalWrite(ENB, HIGH);
+void setLeftMotor(int speed) {
+  if (speed > 0) {
     digitalWrite(IN3, LOW);
     digitalWrite(IN4, HIGH);
+    analogWrite(ENB, constrain(speed, 0, 255));
+  } else if (speed < 0) {
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+    analogWrite(ENB, constrain(-speed, 0, 255));
   } else {
-    leftStop();
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
+    analogWrite(ENB, 0);
   }
-  lfCount++;
 }
 
-void leftStop() {
-  digitalWrite(ENB, LOW);
-  digitalWrite(IN3, LOW);
-  digitalWrite(IN4, LOW);
+void setRightMotor(int speed) {
+  if (speed > 0) {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, HIGH);
+    analogWrite(ENA, constrain(speed, 0, 255));
+  } else if (speed < 0) {
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN2, LOW);
+    analogWrite(ENA, constrain(-speed, 0, 255));
+  } else {
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN2, LOW);
+    analogWrite(ENA, 0);
+  }
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  // Serial.println(angle);
-  // Serial.println(millis());
+  // Input state flags
+  static bool forward = false;
+  static bool backward = false;
+  static bool left = false;
+  static bool right = false;
+  static bool boost = false;
+  
   char incomingChar = ' ';
   if (Serial.available() > 0) {
     incomingChar = Serial.read();  // Read the incoming data
@@ -108,15 +74,15 @@ void loop() {
     Serial.println(incomingChar);
   }
 
-  // arm
+  // Pince control
   if (incomingChar == 'L') {
-    angle+=10;
+    angle += 10;
     if (angle > max_angle) {
       angle = max_angle;
     }
   }
   if (incomingChar == 'K') {
-    angle-=10;
+    angle -= 10;
     if (angle < 0) {
       angle = 0;
     }
@@ -124,59 +90,80 @@ void loop() {
     Serial.println(angle);
   }
 
-  // motors
-  if (incomingChar == 'E') { // end of payload, write the current states
-    Serial.print("Direction (l/r): ");
-    Serial.print(left_direction);
-    Serial.println(right_direction);
-    Serial.print("Angle: ");
-    Serial.println(angle);
-    switch (left_direction) {
-      case 0:
-        leftStop();
-        break;
-      case 1:
-        leftForward(2);
-        break;
-      case -1:
-        leftBackward(2);
-        break;
-    }
-    switch (right_direction) {
-      case 0:
-        rightStop();
-        break;
-      case 1:
-        rightForward(2);
-        break;
-      case -1:
-        rightBackward(2);
-        break;
-    }
-
-    left_direction = 0;
-    right_direction = 0;
-  }
-
+  // Accumulate movement commands
   if (incomingChar == 'W') {
-    left_direction += 1;
-    right_direction += 1;
+    forward = true;
   }
-
   if (incomingChar == 'S') {
-    left_direction += -1;
-    right_direction += -1;
+    backward = true;
   }
-
   if (incomingChar == 'A') {
-    left_direction += -1;
-    right_direction += 1;
+    left = true;
   }
-
   if (incomingChar == 'D') {
-    left_direction += 1;
-    right_direction += -1;
+    right = true;
+  }
+  if (incomingChar == 'H') {
+    boost = true;
   }
 
-  servo.write(angle%360);
+  if (incomingChar == 'E') {
+    int leftMotorSpeed = 0;
+    int rightMotorSpeed = 0;
+    static int base_speed = 150;  // base speed for movement (0-255)
+    static int turn_speed = 100;  // peed difference for turning
+    
+    // boost for straight
+    int current_base_speed = base_speed;
+    if (boost && (forward || backward) && !(left || right)) {
+      current_base_speed = 255;
+    }
+    
+    if (forward && !backward) {
+      leftMotorSpeed = current_base_speed;
+      rightMotorSpeed = current_base_speed;
+      
+      if (left && !right) {
+        leftMotorSpeed = current_base_speed - turn_speed;
+      } else if (right && !left) {
+        rightMotorSpeed = current_base_speed - turn_speed;
+      }
+    } else if (backward && !forward) {
+      leftMotorSpeed = -current_base_speed;
+      rightMotorSpeed = -current_base_speed;
+      
+      if (left && !right) {
+        leftMotorSpeed = -(base_speed - turn_speed);
+      } else if (right && !left) {
+        rightMotorSpeed = -(base_speed - turn_speed);
+      }
+    } else if (!forward && !backward) {
+      if (left && !right) {
+        leftMotorSpeed = -turn_speed;
+        rightMotorSpeed = turn_speed;
+      } else if (right && !left) {
+        leftMotorSpeed = turn_speed;
+        rightMotorSpeed = -turn_speed;
+      }
+    }
+    
+    setLeftMotor(leftMotorSpeed);
+    setRightMotor(rightMotorSpeed);
+    
+    Serial.print("Echo: ");
+    if (boost) Serial.print(" BOOST!");
+    Serial.print(" -> Left: ");
+    Serial.print(leftMotorSpeed);
+    Serial.print(", Right: ");
+    Serial.print(rightMotorSpeed);
+    Serial.println();
+    
+    forward = false;
+    backward = false;
+    left = false;
+    right = false;
+    boost = false;
+  }
+  
+  servo.write(angle % 360);
 }
