@@ -16,7 +16,7 @@ const int max_angle = 18;
 const int min_angle = -30;
 int left_speed = 0;  // -255 to 255, negative = backward
 int right_speed = 0;
-const int servo_speed = 5;
+const int servo_speed = 10;
 
 void setup() {
   Serial.begin(9600);
