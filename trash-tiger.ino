@@ -6,14 +6,17 @@
 #define IN3 6
 #define IN4 5
 #define ENB 3
-#define SERVO 8
+#define SERVO 13
 
 Servo servo;
-int angle = 45;
+const int angle_offset = 29;
+int angle = 0;
 int last_time = 0;
-const int max_angle = 60;
+const int max_angle = 18;
+const int min_angle = -30;
 int left_speed = 0;  // -255 to 255, negative = backward
 int right_speed = 0;
+const int servo_speed = 5;
 
 void setup() {
   Serial.begin(9600);
@@ -27,7 +30,13 @@ void setup() {
   pinMode(ENB, OUTPUT);
 }
 
-void setLeftMotor(int speed) {
+void setRightMotor(int speed) {
+  if (speed > 0 && speed < 200) {
+    speed = 200;
+  } else if (speed < 0 && speed > -200) {
+    speed = -200;
+  }
+  
   if (speed > 0) {
     digitalWrite(IN3, LOW);
     digitalWrite(IN4, HIGH);
@@ -43,7 +52,7 @@ void setLeftMotor(int speed) {
   }
 }
 
-void setRightMotor(int speed) {
+void setLeftMotor(int speed) {
   if (speed > 0) {
     digitalWrite(IN1, LOW);
     digitalWrite(IN2, HIGH);
@@ -76,18 +85,16 @@ void loop() {
 
   // Pince control
   if (incomingChar == 'L') {
-    angle += 10;
+    angle += servo_speed;
     if (angle > max_angle) {
       angle = max_angle;
     }
   }
   if (incomingChar == 'K') {
-    angle -= 10;
-    if (angle < 0) {
-      angle = 0;
+    angle -= servo_speed;
+    if (angle < min_angle) {
+      angle = min_angle;
     }
-    // Serial.print("Angle: ");
-    // Serial.println(angle);
   }
 
   // Accumulate movement commands
@@ -110,52 +117,41 @@ void loop() {
   if (incomingChar == 'E') {
     int leftMotorSpeed = 0;
     int rightMotorSpeed = 0;
-    static int base_speed = 150;  // base speed for movement (0-255)
-    static int turn_speed = 100;  // speed difference for turning
     
-    // boost for straight
-    int current_base_speed = base_speed;
-    if (boost && (forward || backward) && !(left || right)) {
-      current_base_speed = 255;
-    }
-    
+    // SIMPLIFIED LOGIC - ALWAYS FULL FORCE
     if (forward && !backward) {
-      leftMotorSpeed = current_base_speed;
-      rightMotorSpeed = current_base_speed;
-      
-      if (left && !right) {
-        leftMotorSpeed = current_base_speed - turn_speed;
-      } else if (right && !left) {
-        rightMotorSpeed = current_base_speed - turn_speed;
-      }
+      // FORWARD - ignore left/right, just go full forward
+      leftMotorSpeed = 255;
+      rightMotorSpeed = 255;
     } else if (backward && !forward) {
-      leftMotorSpeed = -current_base_speed;
-      rightMotorSpeed = -current_base_speed;
-      
-      if (left && !right) {
-        leftMotorSpeed = -(current_base_speed - turn_speed);
-      } else if (right && !left) {
-        rightMotorSpeed = -(current_base_speed - turn_speed);
-      }
+      // BACKWARD - ignore left/right, just go full backward
+      leftMotorSpeed = -255;
+      rightMotorSpeed = -255;
     } else if (!forward && !backward) {
+      // PURE TANK STEERING - full force
       if (left && !right) {
-        leftMotorSpeed = -turn_speed;
-        rightMotorSpeed = turn_speed;
+        // Turn left: left motor backward, right motor forward
+        leftMotorSpeed = -255;
+        rightMotorSpeed = 255;
       } else if (right && !left) {
-        leftMotorSpeed = turn_speed;
-        rightMotorSpeed = -turn_speed;
+        // Turn right: left motor forward, right motor backward
+        leftMotorSpeed = 255;
+        rightMotorSpeed = -255;
       }
+      // If both left and right or neither, motors stay at 0
     }
+    // If both forward and backward, motors stay at 0 (safety)
     
     setLeftMotor(leftMotorSpeed);
     setRightMotor(rightMotorSpeed);
     
-    // Serial.print("Echo: ");
     if (boost) Serial.print(" BOOST!");
     Serial.print("Left: ");
     Serial.println(leftMotorSpeed);
     Serial.print("Right: ");
     Serial.println(rightMotorSpeed);
+    Serial.print("Angle: ");
+    Serial.println(angle);
     
     forward = false;
     backward = false;
@@ -164,5 +160,5 @@ void loop() {
     boost = false;
   }
   
-  servo.write(angle % 360);
+  servo.write((angle_offset + angle) % 360);
 }
