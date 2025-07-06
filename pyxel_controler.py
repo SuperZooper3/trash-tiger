@@ -41,7 +41,7 @@ class App:
         # every 10 frames the colour should change by 1 and go back to 16 but make sure its calculated just based off frame count
         colour = (pyxel.frame_count // 10) % 15 + 1
         pyxel.cls(0)
-        pyxel.text(0, 0, f"Skibot! Alive {self.alive}", colour)
+        pyxel.text(0, 0, f"Ski bot! Alive {self.alive}", colour)
         pyxel.text(0, 10, f"Sending: {self.payload}", colour)
         pyxel.text(0, 20, self.received, colour)
 

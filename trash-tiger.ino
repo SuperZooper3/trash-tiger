@@ -5,7 +5,7 @@
 #define IN2 12
 #define IN3 6
 #define IN4 5
-#define ENB 7
+#define ENB 3
 #define SERVO 8
 
 Servo servo;
@@ -86,8 +86,8 @@ void loop() {
     if (angle < 0) {
       angle = 0;
     }
-    Serial.print("Angle: ");
-    Serial.println(angle);
+    // Serial.print("Angle: ");
+    // Serial.println(angle);
   }
 
   // Accumulate movement commands
@@ -111,7 +111,7 @@ void loop() {
     int leftMotorSpeed = 0;
     int rightMotorSpeed = 0;
     static int base_speed = 150;  // base speed for movement (0-255)
-    static int turn_speed = 100;  // peed difference for turning
+    static int turn_speed = 100;  // speed difference for turning
     
     // boost for straight
     int current_base_speed = base_speed;
@@ -133,9 +133,9 @@ void loop() {
       rightMotorSpeed = -current_base_speed;
       
       if (left && !right) {
-        leftMotorSpeed = -(base_speed - turn_speed);
+        leftMotorSpeed = -(current_base_speed - turn_speed);
       } else if (right && !left) {
-        rightMotorSpeed = -(base_speed - turn_speed);
+        rightMotorSpeed = -(current_base_speed - turn_speed);
       }
     } else if (!forward && !backward) {
       if (left && !right) {
@@ -150,13 +150,12 @@ void loop() {
     setLeftMotor(leftMotorSpeed);
     setRightMotor(rightMotorSpeed);
     
-    Serial.print("Echo: ");
+    // Serial.print("Echo: ");
     if (boost) Serial.print(" BOOST!");
-    Serial.print(" -> Left: ");
-    Serial.print(leftMotorSpeed);
-    Serial.print(", Right: ");
-    Serial.print(rightMotorSpeed);
-    Serial.println();
+    Serial.print("Left: ");
+    Serial.println(leftMotorSpeed);
+    Serial.print("Right: ");
+    Serial.println(rightMotorSpeed);
     
     forward = false;
     backward = false;
